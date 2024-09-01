@@ -1,20 +1,18 @@
 import React from 'react';
 import { Box, Text, VStack, Heading } from '@chakra-ui/react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const ReorderPointDiagram = ({ customerData, supplyChainData, reorderFrequency, reorderPoint, orderQuantity }) => {
   const generateInventoryData = () => {
     const data = [];
-    const dailyDemand = customerData.reduce((acc, customer) => {
-      return acc + (customer.currentUnits + customer.futureUnits) / (2 * customer.consumptionFrequency);
-    }, 0);
-    
+    const dailyDemand = calculateDailyDemand();
     let currentInventory = reorderPoint + orderQuantity;
-    const leadTime = Object.values(supplyChainData).reduce((acc, task) => acc + task.days, 0);
-    
-    for (let day = 0; day <= 365; day++) {
-      if (day % reorderFrequency.daysInPeriod === 0 && day !== 0) {
-        currentInventory = Math.min(currentInventory + orderQuantity, reorderPoint + orderQuantity);
+    const daysToSimulate = 365; // Simulate for a year
+
+    for (let day = 0; day <= daysToSimulate; day++) {
+      // Add order quantity when inventory reaches reorder point
+      if (currentInventory <= reorderPoint && day % reorderFrequency.daysInPeriod === 0) {
+        currentInventory += orderQuantity;
       }
 
       data.push({
@@ -27,6 +25,13 @@ const ReorderPointDiagram = ({ customerData, supplyChainData, reorderFrequency, 
     }
 
     return data;
+  };
+
+  const calculateDailyDemand = () => {
+    const annualDemand = customerData.reduce((acc, customer) => {
+      return acc + ((customer.currentUnits + customer.futureUnits) * (365 / customer.consumptionFrequency));
+    }, 0);
+    return annualDemand / 365;
   };
 
   const data = generateInventoryData();
@@ -42,14 +47,11 @@ const ReorderPointDiagram = ({ customerData, supplyChainData, reorderFrequency, 
             <YAxis label={{ value: 'Inventory Level', angle: -90, position: 'insideLeft' }} />
             <Tooltip />
             <Legend />
-            <ReferenceLine y={reorderPoint} label="Reorder Point" stroke="red" strokeDasharray="3 3" />
-            <Line type="monotone" dataKey="inventory" stroke="#8884d8" activeDot={{ r: 8 }} />
-            <Line type="monotone" dataKey="reorderPoint" stroke="red" strokeDasharray="3 3" />
+            <Line type="monotone" dataKey="inventory" stroke="#8884d8" dot={false} name="Inventory" />
+            <Line type="monotone" dataKey="reorderPoint" stroke="#82ca9d" strokeDasharray="5 5" name="Reorder Point" />
           </LineChart>
         </ResponsiveContainer>
         <Text>Reorder Point: {reorderPoint} units</Text>
-        <Text>Order Quantity: {orderQuantity} units</Text>
-        <Text>Reorder Frequency: {reorderFrequency.label}</Text>
       </VStack>
     </Box>
   );

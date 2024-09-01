@@ -4,15 +4,15 @@ import ReorderPointDiagram from './ReorderPointDiagram';
 
 const REORDER_FREQUENCIES = {
   WEEKLY: { label: 'Weekly', daysInPeriod: 7 },
+  BIWEEKLY: { label: 'Bi-weekly', daysInPeriod: 14 },
   MONTHLY: { label: 'Monthly', daysInPeriod: 30 },
   QUARTERLY: { label: 'Quarterly', daysInPeriod: 90 },
-  BIANNUAL: { label: '6 Months', daysInPeriod: 180 },
+  SEMIANNUALLY: { label: '6 Months', daysInPeriod: 180 },
   YEARLY: { label: 'Yearly', daysInPeriod: 365 },
 };
 
-const InventoryForecast = ({ customerData, supplyChainData, onReorderQuantityChange }) => {
-  const [reorderFrequency, setReorderFrequency] = useState(REORDER_FREQUENCIES.MONTHLY);
-  const [totalDemand, setTotalDemand] = useState(0);
+const InventoryForecast = ({ customerData, supplyChainData, reorderFrequency, onReorderFrequencyChange, onReorderQuantityChange }) => {
+  const [annualDemand, setAnnualDemand] = useState(0);
   const [reorderPoint, setReorderPoint] = useState(0);
   const [orderQuantity, setOrderQuantity] = useState(0);
 
@@ -23,33 +23,38 @@ const InventoryForecast = ({ customerData, supplyChainData, onReorderQuantityCha
   }, [customerData, reorderFrequency]);
 
   const calculateMetrics = () => {
-    const annualDemand = calculateAnnualDemand();
-    const demandPerPeriod = (annualDemand / 365) * reorderFrequency.daysInPeriod;
-    const orderQty = Math.round(demandPerPeriod);
-    const reorderPt = calculateReorderPoint(annualDemand);
+    const calculatedAnnualDemand = calculateAnnualDemand();
+    console.log("Calculated Annual Demand:", calculatedAnnualDemand);
+    const calculatedReorderPoint = calculateReorderPoint(calculatedAnnualDemand);
+    const calculatedOrderQuantity = calculateOrderQuantity(calculatedAnnualDemand);
 
-    setTotalDemand(annualDemand);
-    setOrderQuantity(orderQty);
-    setReorderPoint(reorderPt);
-    onReorderQuantityChange(orderQty);
+    setAnnualDemand(calculatedAnnualDemand);
+    setReorderPoint(calculatedReorderPoint);
+    setOrderQuantity(calculatedOrderQuantity);
+    onReorderQuantityChange(calculatedOrderQuantity);
   };
 
   const calculateAnnualDemand = () => {
     return customerData.reduce((acc, customer) => {
-      const dailyDemand = (customer.currentUnits + customer.futureUnits) / (2 * customer.consumptionFrequency);
-      return acc + (dailyDemand * 365);
+      // Calculate annual demand for each customer
+      const customerAnnualDemand = (customer.currentUnits + customer.futureUnits) * (365 / customer.consumptionFrequency);
+      console.log(`Customer: ${customer.customerName}, Annual Demand: ${customerAnnualDemand}`);
+      return acc + customerAnnualDemand;
     }, 0);
   };
 
-  const calculateReorderPoint = (annualDemand) => {
-    const dailyDemand = annualDemand / 365;
+  const calculateReorderPoint = (calculatedAnnualDemand) => {
+    const dailyDemand = calculatedAnnualDemand / 365;
     const leadTime = Object.values(supplyChainData).reduce((acc, task) => acc + task.days, 0);
     const leadTimeDemand = dailyDemand * leadTime;
-
-    const leadTimeVariance = Object.values(supplyChainData).reduce((acc, task) => acc + task.variance ** 2, 0);
-    const safetyStock = 1.65 * Math.sqrt(dailyDemand ** 2 * leadTimeVariance + leadTime ** 2 * (dailyDemand * 0.1) ** 2);
+    const safetyStock = dailyDemand * 7; // Assuming 7 days of safety stock
 
     return Math.round(leadTimeDemand + safetyStock);
+  };
+
+  const calculateOrderQuantity = (calculatedAnnualDemand) => {
+    const demandDuringReorderPeriod = (calculatedAnnualDemand / 365) * reorderFrequency.daysInPeriod;
+    return Math.round(demandDuringReorderPeriod);
   };
 
   return (
@@ -60,7 +65,7 @@ const InventoryForecast = ({ customerData, supplyChainData, onReorderQuantityCha
           <Text>Reorder Frequency:</Text>
           <Select 
             value={reorderFrequency.label} 
-            onChange={(e) => setReorderFrequency(Object.values(REORDER_FREQUENCIES).find(f => f.label === e.target.value))}
+            onChange={(e) => onReorderFrequencyChange(REORDER_FREQUENCIES[Object.keys(REORDER_FREQUENCIES).find(key => REORDER_FREQUENCIES[key].label === e.target.value)])}
           >
             {Object.values(REORDER_FREQUENCIES).map(freq => (
               <option key={freq.label} value={freq.label}>{freq.label}</option>
@@ -77,7 +82,7 @@ const InventoryForecast = ({ customerData, supplyChainData, onReorderQuantityCha
           <Tbody>
             <Tr>
               <Td>Annual Demand (units)</Td>
-              <Td isNumeric>{Math.round(totalDemand)}</Td>
+              <Td isNumeric>{Math.round(annualDemand)}</Td>
             </Tr>
             <Tr>
               <Td>Reorder Point (units)</Td>

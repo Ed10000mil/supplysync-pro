@@ -22,15 +22,15 @@ const Dashboard = ({ customerData }) => {
 
   const calculateDemand = () => {
     const demand = customerData.reduce((acc, customer) => {
-      const dailyDemand = (customer.currentUnits + customer.futureUnits) / (2 * customer.consumptionFrequency);
+      const dailyDemand = (customer.currentUnits + customer.futureUnits) / customer.consumptionFrequency;
       return acc + (dailyDemand * timeFrame.days);
     }, 0);
     setTotalDemand(Math.round(demand));
   };
 
   const generateDemandTrend = () => {
-    const trend = customerData.map((customer, index) => ({
-      name: customer.customerName || `Customer ${index + 1}`,
+    const trend = customerData.map((customer) => ({
+      name: customer.customerName,
       current: (customer.currentUnits / customer.consumptionFrequency) * timeFrame.days,
       future: (customer.futureUnits / customer.consumptionFrequency) * timeFrame.days,
     }));
